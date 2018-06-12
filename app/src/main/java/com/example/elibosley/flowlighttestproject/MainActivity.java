@@ -18,6 +18,7 @@ import com.google.android.things.contrib.driver.bmx280.Bmx280;
 import com.google.android.things.contrib.driver.ht16k33.AlphanumericDisplay;
 import com.google.android.things.contrib.driver.ht16k33.Ht16k33;
 import com.google.android.things.contrib.driver.rainbowhat.RainbowHat;
+import com.google.android.things.device.TimeManager;
 import com.google.android.things.pio.Gpio;
 
 import java.io.IOException;
@@ -75,6 +76,13 @@ public class MainActivity extends Activity implements View.OnClickListener {
         // Don't allow the keyboard to show when the main screen starts
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN);
 
+        /* Set up time manager to set the time zone */
+        TimeManager timeManager = TimeManager.getInstance();
+        // Use 24-hour time
+        timeManager.setTimeFormat(TimeManager.FORMAT_12);
+        // Set time zone to Eastern Standard Time
+        timeManager.setTimeZone("America/New_York");
+
         startTimeButton = findViewById(R.id.flowStartTime);
         endTimeButton = findViewById(R.id.flowEndTime);
         startTimeButton.setOnClickListener(this);
@@ -92,12 +100,10 @@ public class MainActivity extends Activity implements View.OnClickListener {
 
 
             // Display the temperature on the segment display.
-            sensor = RainbowHat.openSensor();
-            sensor.setTemperatureOversampling(Bmx280.OVERSAMPLING_1X);
             segment = RainbowHat.openDisplay();
             segment.setBrightness(Ht16k33.HT16K33_BRIGHTNESS_MAX);
-            segment.display(sensor.readTemperature());
             segment.setEnabled(true);
+            segment.clear();
 
         } catch (IOException e) {
             Log.e("RainbowHat", "onCreate: ", e);
@@ -124,18 +130,12 @@ public class MainActivity extends Activity implements View.OnClickListener {
     private void saveFlowTime() {
         if (startTimeButton.getText() != null && endTimeButton.getText() != null) {
             try {
-
                 startTime = LocalTime.parse(startTimeButton.getText());
-                DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("hh:mm:ss", Locale.US);
-                startTime = LocalTime.parse(startTimeButton.getText(), dateTimeFormatter);
                 endTime = LocalTime.parse(endTimeButton.getText());
-                Log.d("START", startTime.toString());
-                Log.d("END", endTime.toString());
                 setStartTime.setText(startTime.toString());
                 setEndTime.setText(endTime.toString());
                 checkTimes();
-            }
-            catch (Exception e) {
+            } catch (Exception e) {
                 e.printStackTrace();
             }
         }
@@ -145,7 +145,7 @@ public class MainActivity extends Activity implements View.OnClickListener {
         TimePickerDialog.OnTimeSetListener timeSetListener = new TimePickerDialog.OnTimeSetListener() {
             @Override
             public void onTimeSet(TimePicker view, int hourOfDay, int minute) {
-                v.setText(String.format("%02d", hourOfDay) + ":"+String.format("%02d", minute) + ":00");
+                v.setText(String.format("%02d", hourOfDay) + ":" + String.format("%02d", minute) + ":00");
             }
         };
         TimePickerDialog dialog = new TimePickerDialog(v.getContext(), timeSetListener, 0, 0, false);
@@ -156,9 +156,9 @@ public class MainActivity extends Activity implements View.OnClickListener {
         @Override
         public void onReceive(Context context, Intent intent) {
             final String action = intent.getAction();
-
             if (action.equals(Intent.ACTION_TIME_CHANGED) ||
-                    action.equals(Intent.ACTION_TIMEZONE_CHANGED)) {
+                    action.equals(Intent.ACTION_TIMEZONE_CHANGED) ||
+                    action.equals(Intent.ACTION_TIME_TICK)) {
                 checkTimes();
             }
         }
@@ -166,13 +166,18 @@ public class MainActivity extends Activity implements View.OnClickListener {
 
 
     private void checkTimes() {
-        TimeZone tz = TimeZone.getDefault();
         LocalTime t = LocalTime.now();
 
         Log.d("TIME CHECK", t.toString() + "after? : " + t.isAfter(startTime) + "before? : " + t.isBefore(endTime));
         if (t.isAfter(startTime) && t.isBefore(endTime)) {
             try {
                 segment.display("FLOW");
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        } else {
+            try {
+                segment.clear();
             } catch (IOException e) {
                 e.printStackTrace();
             }
