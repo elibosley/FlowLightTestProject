@@ -6,6 +6,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -58,8 +59,9 @@ public class MainActivity extends Activity implements View.OnClickListener {
     Button saveButton, startTimeButton, endTimeButton;
     TextView setStartTime, setEndTime;
     LocalTime startTime, endTime; // these are the actual times that have been set
+    SharedPreferences sharedPreferences;
     final static IntentFilter s_intentFilter;
-
+    final String appName = "com.example.elibosley.flowlighttestproject";
     static {
         s_intentFilter = new IntentFilter();
         s_intentFilter.addAction(Intent.ACTION_TIME_TICK);
@@ -110,6 +112,7 @@ public class MainActivity extends Activity implements View.OnClickListener {
         }
 
         registerReceiver(m_timeChangedReceiver, MainActivity.s_intentFilter);
+        sharedPreferences = this.getSharedPreferences(appName, Context.MODE_PRIVATE);
 
     }
 
@@ -127,6 +130,13 @@ public class MainActivity extends Activity implements View.OnClickListener {
         super.onDestroy();
     }
 
+    private void loadSavedTime() {
+            String tempStartTime = sharedPreferences.getString("startTime", "Start Time");
+            String tempEndTime = sharedPreferences.getString("endTime", "End Time");
+            startTimeButton.setText(tempStartTime);
+            endTimeButton.setText(tempEndTime);
+    }
+
     private void saveFlowTime() {
         if (startTimeButton.getText() != null && endTimeButton.getText() != null) {
             try {
@@ -134,6 +144,9 @@ public class MainActivity extends Activity implements View.OnClickListener {
                 endTime = LocalTime.parse(endTimeButton.getText());
                 setStartTime.setText(startTime.toString());
                 setEndTime.setText(endTime.toString());
+
+                sharedPreferences.edit().putString("startTime", startTimeButton.getText().toString());
+                sharedPreferences.edit().putString("endTime", endTimeButton.getText().toString());
                 checkTimes();
             } catch (Exception e) {
                 e.printStackTrace();
@@ -167,8 +180,6 @@ public class MainActivity extends Activity implements View.OnClickListener {
 
     private void checkTimes() {
         LocalTime t = LocalTime.now();
-
-        Log.d("TIME CHECK", t.toString() + "after? : " + t.isAfter(startTime) + "before? : " + t.isBefore(endTime));
         if (t.isAfter(startTime) && t.isBefore(endTime)) {
             try {
                 segment.display("FLOW");
